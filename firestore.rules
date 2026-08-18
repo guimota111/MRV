@@ -1,0 +1,63 @@
+rules_version = '2';
+
+// =============================================================================
+// ⚠️  ATENÇÃO — REGRAS DE PROTÓTIPO, ABERTAS AO PÚBLICO
+//
+// Nesta fase o app não tem autenticação, então leitura e escrita estão
+// liberadas para qualquer pessoa que descubra a URL do projeto. Isso é
+// aceitável apenas para a demonstração interna com dados de exemplo.
+//
+// ANTES DE COLOCAR DADOS REAIS DE OBRA AQUI, troque `permitirProtótipo()` por
+// uma checagem de autenticação. Com Firebase Auth restrito ao domínio da MRV,
+// a regra vira:
+//
+//     function autorizado() {
+//       return request.auth != null
+//              && request.auth.token.email.matches('.*@mrv[.]com[.]br');
+//     }
+//
+// e cada `allow` passa a usar `autorizado()`. A estrutura das regras abaixo já
+// está organizada para essa troca ser feita em um lugar só.
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Ponto único de troca quando a autenticação entrar (ver comentário acima).
+    function permitirProtótipo() {
+      return true;
+    }
+
+    // As Cloud Functions usam o Admin SDK e passam por cima destas regras;
+    // elas valem para o acesso vindo do navegador.
+
+    match /empreendimentos/{empreendimentoId} {
+      allow read: if permitirProtótipo();
+      // O client cria empreendimentos direto; exigimos ao menos um nome.
+      allow create: if permitirProtótipo()
+                    && request.resource.data.nome is string
+                    && request.resource.data.nome.size() > 0
+                    && request.resource.data.nome.size() <= 200;
+      allow update, delete: if permitirProtótipo();
+
+      // Reuniões são escritas apenas pela function `processarAta` (Admin SDK).
+      // O navegador só lê, para acompanhar o status do processamento.
+      match /reunioes/{reuniaoId} {
+        allow read: if permitirProtótipo();
+        allow write: if false;
+      }
+    }
+
+    // Temas são gravados por `processarAta` e atualizados por
+    // `detectarRecorrencia`, ambos via Admin SDK. O navegador só lê.
+    match /temas/{temaId} {
+      allow read: if permitirProtótipo();
+      allow write: if false;
+    }
+
+    // Nada mais é acessível.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

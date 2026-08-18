@@ -1,0 +1,5 @@
+{
+  "comment": "As consultas do app filtram por um campo só (empreendimentoId, disciplina, reuniaoId) ou ordenam por um campo só (nome, createdAt). O Firestore atende todas com os índices automáticos de campo único, então não há índice composto a declarar. Se no futuro entrar uma consulta com dois filtros (ex.: empreendimentoId + status ordenado por data), o console do Firebase mostra o índice necessário no erro e ele deve ser acrescentado aqui.",
+  "indexes": [],
+  "fieldOverrides": []
+}

@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Azul-petróleo institucional, usado em cabeçalhos e destaques. */
+  --color-marca-50: #eef6fb;
+  --color-marca-100: #d6e8f4;
+  --color-marca-200: #b0d2e9;
+  --color-marca-300: #7fb4d8;
+  --color-marca-400: #4a90c2;
+  --color-marca-500: #2c72a8;
+  --color-marca-600: #1f5a8a;
+  --color-marca-700: #1a4770;
+  --color-marca-800: #1a3b5c;
+  --color-marca-900: #1a3350;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Barra de rolagem discreta nas tabelas largas. */
+.rolagem-fina::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.rolagem-fina::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-slate-300;
+}
+.rolagem-fina::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+/*
+ * Regras de impressão para /relatorio/[id]: some com a navegação e com
+ * qualquer controle interativo, e evita quebrar um card no meio da página.
+ */
+@media print {
+  .sem-impressao {
+    display: none !important;
+  }
+  body {
+    @apply bg-white;
+  }
+  .quebra-evitar {
+    break-inside: avoid;
+  }
+  .pagina-nova {
+    break-before: page;
+  }
+  @page {
+    margin: 14mm;
+  }
+}

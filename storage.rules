@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// =============================================================================
+// ⚠️  ATENÇÃO — REGRAS DE PROTÓTIPO, ABERTAS AO PÚBLICO
+//
+// Sem autenticação nesta fase: qualquer pessoa com a URL pode enviar e ler as
+// atas. Antes de subir documentos reais de obra, troque `permitirProtótipo()`
+// por uma checagem `request.auth != null` (ver comentário em firestore.rules).
+// =============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function permitirProtótipo() {
+      return true;
+    }
+
+    // Atas originais, guardadas para auditoria/referência.
+    // O caminho é montado pelo client em `src/lib/api.ts`.
+    match /atas/{empreendimentoId}/{arquivo} {
+      allow read: if permitirProtótipo();
+
+      allow write: if permitirProtótipo()
+                   // 64 MB cobre folgadamente um DOCX com croquis embutidos.
+                   && request.resource.size < 64 * 1024 * 1024
+                   && (
+                        request.resource.contentType == 'application/pdf'
+                        || request.resource.contentType ==
+                             'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                        // Alguns navegadores não preenchem o content-type;
+                        // a function valida a extensão de novo antes de processar.
+                        || request.resource.contentType == 'application/octet-stream'
+                      );
+
+      allow delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
