@@ -40,8 +40,22 @@ export function db(): Firestore {
   return getFirestore(app());
 }
 
+/**
+ * Quanto tempo o SDK insiste num upload antes de desistir.
+ *
+ * O padrão do Firebase é 10 minutos, o que transforma uma falha imediata e
+ * permanente — bucket inexistente, regra negando — em dez minutos de barra de
+ * progresso girando antes de um `retry-limit-exceeded` sem explicação. Um
+ * minuto ainda cobre folgadamente uma oscilação de rede num arquivo grande, e
+ * devolve os erros de configuração enquanto ainda dá para agir sobre eles.
+ */
+const TEMPO_MAX_RETRY_MS = 60_000;
+
 export function storage(): FirebaseStorage {
-  return getStorage(app());
+  const st = getStorage(app());
+  st.maxUploadRetryTime = TEMPO_MAX_RETRY_MS;
+  st.maxOperationRetryTime = TEMPO_MAX_RETRY_MS;
+  return st;
 }
 
 export function functions(): Functions {
