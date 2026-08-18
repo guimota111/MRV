@@ -96,18 +96,21 @@ os três são o mesmo assunto) é fechada na leitura, por union-find, em
 Pré-requisitos: Node 22, um projeto Firebase no plano Blaze (Cloud Functions
 exige), e uma chave da API da Anthropic.
 
+O projeto Firebase já está configurado: `.firebaserc` aponta para `mrvbraga` e
+`apphosting.yaml` traz a configuração web. Falta apenas a chave da Anthropic e
+o deploy.
+
 ```bash
 # 1. Dependências
 npm install
 npm --prefix functions install
 
-# 2. Firebase CLI e projeto
+# 2. Firebase CLI
 npm install -g firebase-tools
 firebase login
-firebase use --add            # escolha o projeto e dê o alias "default"
 
-# 3. Configuração do frontend
-cp .env.example .env.local    # preencha com os dados do Console → Seus apps
+# 3. Configuração do frontend para rodar local
+cp .env.example .env.local    # ou copie os valores de apphosting.yaml
 
 # 4. Chave da Anthropic (fica só no Secret Manager)
 firebase functions:secrets:set ANTHROPIC_API_KEY
@@ -118,6 +121,16 @@ firebase deploy --only firestore:rules,storage,functions
 # 6. Rodar o frontend localmente
 npm run dev                   # http://localhost:3000
 ```
+
+> **O deploy das regras é obrigatório antes do primeiro uso.** Um banco
+> Firestore recém-criado vem em modo produção, negando toda leitura e escrita —
+> o app mostra "Missing or insufficient permissions" até `firestore.rules` ser
+> publicado.
+
+Se o log de `processarAta` acusar bucket inexistente, defina a variável de
+ambiente `STORAGE_BUCKET` da function como `mrvbraga.firebasestorage.app`: a
+resolução automática do Admin SDK já apontou para a nomenclatura antiga
+(`<projeto>.appspot.com`) em projetos criados sob o padrão novo.
 
 ### Deploy do frontend (App Hosting)
 

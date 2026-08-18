@@ -14,37 +14,37 @@ runConfig:
 
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: SUBSTITUA_PELA_API_KEY
+    value: AIzaSyACUKNB3xfkNCc4761uVI8nGt0XUAc7G5E
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: SUBSTITUA.firebaseapp.com
+    value: mrvbraga.firebaseapp.com
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: SUBSTITUA_PELO_PROJECT_ID
+    value: mrvbraga
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: SUBSTITUA.firebasestorage.app
+    value: mrvbraga.firebasestorage.app
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: SUBSTITUA_PELO_SENDER_ID
+    value: "966484624487"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: SUBSTITUA_PELO_APP_ID
+    value: 1:966484624487:web:f668046a4649364a4a00c2
     availability:
       - BUILD
       - RUNTIME

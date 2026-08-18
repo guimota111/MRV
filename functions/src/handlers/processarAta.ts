@@ -1,7 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
-import { ANTHROPIC_API_KEY, OPCOES_PESADAS } from "../config";
+import { ANTHROPIC_API_KEY, BUCKET_ATAS, OPCOES_PESADAS } from "../config";
 import { NAO_INFORMADO, TemaExtraido, TipoFonte } from "../domain";
 import {
   COL_EMPREENDIMENTOS,
@@ -112,7 +112,7 @@ export const processarAta = onCall(
           );
         }
 
-        const arquivo = storage.bucket().file(storagePath);
+        const arquivo = storage.bucket(BUCKET_ATAS).file(storagePath);
         const [existe] = await arquivo.exists();
         if (!existe) {
           throw new HttpsError(
