@@ -7,7 +7,7 @@ rules_version = '2';
 // liberadas para qualquer pessoa que descubra a URL do projeto. Isso é
 // aceitável apenas para a demonstração interna com dados de exemplo.
 //
-// ANTES DE COLOCAR DADOS REAIS DE OBRA AQUI, troque `permitirProtótipo()` por
+// ANTES DE COLOCAR DADOS REAIS DE OBRA AQUI, troque `permitirPrototipo()` por
 // uma checagem de autenticação. Com Firebase Auth restrito ao domínio da MRV,
 // a regra vira:
 //
@@ -24,7 +24,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Ponto único de troca quando a autenticação entrar (ver comentário acima).
-    function permitirProtótipo() {
+    function permitirPrototipo() {
       return true;
     }
 
@@ -32,18 +32,18 @@ service cloud.firestore {
     // elas valem para o acesso vindo do navegador.
 
     match /empreendimentos/{empreendimentoId} {
-      allow read: if permitirProtótipo();
+      allow read: if permitirPrototipo();
       // O client cria empreendimentos direto; exigimos ao menos um nome.
-      allow create: if permitirProtótipo()
+      allow create: if permitirPrototipo()
                     && request.resource.data.nome is string
                     && request.resource.data.nome.size() > 0
                     && request.resource.data.nome.size() <= 200;
-      allow update, delete: if permitirProtótipo();
+      allow update, delete: if permitirPrototipo();
 
       // Reuniões são escritas apenas pela function `processarAta` (Admin SDK).
       // O navegador só lê, para acompanhar o status do processamento.
       match /reunioes/{reuniaoId} {
-        allow read: if permitirProtótipo();
+        allow read: if permitirPrototipo();
         allow write: if false;
       }
     }
@@ -51,7 +51,7 @@ service cloud.firestore {
     // Temas são gravados por `processarAta` e atualizados por
     // `detectarRecorrencia`, ambos via Admin SDK. O navegador só lê.
     match /temas/{temaId} {
-      allow read: if permitirProtótipo();
+      allow read: if permitirPrototipo();
       allow write: if false;
     }
 

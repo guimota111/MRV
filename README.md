@@ -146,10 +146,17 @@ builda e serve o Next.js com SSR nativo a cada push.
 ### Verificações
 
 ```bash
-npm run typecheck && npm run lint && npm test    # frontend
+npm run typecheck && npm run lint && npm test    # frontend (22 testes)
 npm --prefix functions run typecheck             # backend
 npm --prefix functions test                      # backend (34 testes)
+npm run test:rules                               # regras (22 verificações)
 ```
+
+`test:rules` sobe os emuladores de Firestore e Storage e confere o
+comportamento das regras: quem o navegador pode ler, o que ele pode criar em
+`empreendimentos` (e com que validação), e que `temas/`, `reunioes/` e os
+caminhos fora de `atas/` estão fechados para ele. Precisa de Java instalado —
+é o que o emulador do Firestore usa.
 
 ## Decisões que valem registro
 
@@ -200,7 +207,12 @@ function autorizado() {
 ```
 
 Escritas em `temas/` e `reunioes/` já estão bloqueadas para o navegador: só as
-Cloud Functions gravam nelas, via Admin SDK.
+Cloud Functions gravam nelas, via Admin SDK. `npm run test:rules` verifica isso
+contra o emulador.
+
+Identificadores nas regras precisam ser ASCII — `permitirPrototipo`, sem
+acento. A linguagem de rules rejeita o arquivo inteiro se houver acento num
+nome de função (comentários acentuados são aceitos normalmente).
 
 Antes de uso em produção, vale também alinhar com o time de segurança da MRV se
 dados de obra podem trafegar pela API da Anthropic, e avaliar Zero Data
