@@ -71,14 +71,13 @@ export function urlExportarExcel(empreendimentoId?: string): string {
     : base;
 }
 
-/** Mensagem de erro legível a partir de um erro de callable function. */
 /**
- * Erros do Storage que só o SDK sabe nomear, traduzidos para o que a pessoa
- * precisa fazer. `retry-limit-exceeded` é o mais traiçoeiro: o SDK insiste
+ * Erros que só o SDK sabe nomear, traduzidos para o que a pessoa precisa
+ * fazer. `retry-limit-exceeded` é o mais traiçoeiro: o SDK insiste
  * mesmo em falhas permanentes, então ele quase sempre significa que o bucket
  * não existe ou que as regras não foram publicadas — não instabilidade de rede.
  */
-const MENSAGENS_STORAGE: Record<string, string> = {
+const MENSAGENS_POR_CODIGO: Record<string, string> = {
   "storage/retry-limit-exceeded":
     "O envio não completou. Normalmente isso significa que o Firebase Storage " +
     "ainda não foi ativado no projeto, ou que as regras de Storage não foram " +
@@ -90,20 +89,64 @@ const MENSAGENS_STORAGE: Record<string, string> = {
     "O envio falhou sem resposta do servidor. Verifique se o Firebase Storage " +
     "está ativado no projeto e se o bucket em NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET " +
     "confere com o que aparece no Console.",
-  "storage/quota-exceeded":
-    "A cota de armazenamento do projeto foi excedida.",
+  "storage/quota-exceeded": "A cota de armazenamento do projeto foi excedida.",
   "storage/canceled": "Envio cancelado.",
+
+  // As functions repassam a causa real via HttpsError, e essa mensagem é
+  // preferida quando existe. `functions/internal` sem mensagem própria é o
+  // caso em que o SDK não conseguiu sequer interpretar a resposta — na
+  // prática, a function não está publicada e o que voltou foi um 404.
+  "functions/internal":
+    "O backend não respondeu como esperado. Verifique se as Cloud Functions " +
+    "foram publicadas (firebase deploy --only functions).",
+  "functions/not-found":
+    "A função chamada não existe neste projeto. Publique o backend com " +
+    "firebase deploy --only functions.",
+  "functions/deadline-exceeded":
+    "O processamento passou do tempo limite. Atas muito longas podem precisar " +
+    "ser divididas em partes menores.",
+  "functions/unavailable":
+    "O backend está indisponível no momento. Tente novamente em alguns instantes.",
 };
+
+/**
+ * Diz se a mensagem do erro veio das nossas Cloud Functions.
+ *
+ * Só vale para códigos `functions/*`: ali a mensagem é a que o `HttpsError`
+ * mandou e descreve a causa concreta ("PDF de 45 MB excede o limite"), então
+ * ganha do texto genérico. Erros de `storage/*` trazem boilerplate do próprio
+ * SDK, que não explica nada — para esses, a tradução acima é sempre melhor.
+ */
+function temMensagemDaFunction(erro: object): boolean {
+  const codigo = String((erro as { code?: unknown }).code ?? "");
+  if (!codigo.startsWith("functions/")) return false;
+
+  const m = (erro as { message?: unknown }).message;
+  if (typeof m !== "string") return false;
+
+  const limpo = m.replace(/^FirebaseError:\s*/, "").trim();
+  // Sem mensagem de verdade, o SDK repete o próprio código no lugar dela.
+  return limpo !== "" && limpo !== codigo && limpo !== codigo.split("/").pop();
+}
 
 export function mensagemDeErro(erro: unknown): string {
   if (erro && typeof erro === "object") {
     const codigo = (erro as { code?: unknown }).code;
-    if (typeof codigo === "string" && MENSAGENS_STORAGE[codigo]) {
-      return MENSAGENS_STORAGE[codigo];
-    }
-    if ("message" in erro) {
+
+    // A mensagem que a própria function mandou é sempre a mais específica —
+    // ela sabe se o PDF passou do limite, se nenhum tema foi encontrado, etc.
+    if (temMensagemDaFunction(erro)) {
       const m = String((erro as { message: unknown }).message);
       // O SDK prefixa erros de callable com "FirebaseError: ".
+      return m.replace(/^FirebaseError:\s*/, "");
+    }
+
+    if (typeof codigo === "string" && MENSAGENS_POR_CODIGO[codigo]) {
+      return MENSAGENS_POR_CODIGO[codigo];
+    }
+
+    if ("message" in erro) {
+      const m = String((erro as { message: unknown }).message);
       return m.replace(/^FirebaseError:\s*/, "");
     }
   }
