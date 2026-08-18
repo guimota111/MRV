@@ -48,58 +48,63 @@ function exigirString(valor: unknown, campo: string): string {
 export const processarAta = onCall(
   { ...OPCOES_PESADAS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
-    const dados = (request.data ?? {}) as EntradaProcessarAta;
-    const empreendimentoId = exigirString(
-      dados.empreendimentoId,
-      "empreendimentoId",
-    );
-
-    const empreendimentoRef = db
-      .collection(COL_EMPREENDIMENTOS)
-      .doc(empreendimentoId);
-    const empreendimentoSnap = await empreendimentoRef.get();
-    if (!empreendimentoSnap.exists) {
-      throw new HttpsError("not-found", "Empreendimento não encontrado.");
-    }
-    const empreendimentoNome =
-      (empreendimentoSnap.get("nome") as string | undefined) ?? "Sem nome";
-
-    const storagePath =
-      typeof dados.storagePath === "string" && dados.storagePath.trim() !== ""
-        ? dados.storagePath.trim()
-        : undefined;
-    const textoColado =
-      typeof dados.texto === "string" && dados.texto.trim() !== ""
-        ? dados.texto.trim()
-        : undefined;
-
-    if (!storagePath && !textoColado) {
-      throw new HttpsError(
-        "invalid-argument",
-        "Envie um arquivo (storagePath) ou cole o texto da ata (texto).",
-      );
-    }
-
-    const nomeArquivo =
-      typeof dados.nomeArquivo === "string" && dados.nomeArquivo.trim() !== ""
-        ? dados.nomeArquivo.trim()
-        : undefined;
-
-    // Cria a reunião já em "processando" para que a UI mostre o andamento.
-    const reuniaoRef = empreendimentoRef.collection(COL_REUNIOES).doc();
-    let tipoFonte: TipoFonte = textoColado ? "texto_colado" : "manual";
-
-    await reuniaoRef.set({
-      data: normalizarData(dados.dataReuniao) || "",
-      tipoFonte,
-      nomeArquivoOriginal: nomeArquivo ?? null,
-      arquivoOriginalUrl: null,
-      status: "processando",
-      processadoEm: null,
-      createdAt: FieldValue.serverTimestamp(),
-    });
+    // Declarada fora do try porque o catch precisa dela para marcar a reunião
+    // como "erro" — e ela pode nem ter sido criada quando a falha acontece.
+    let reuniaoRef: FirebaseFirestore.DocumentReference | undefined;
+    let empreendimentoId = "";
 
     try {
+      const dados = (request.data ?? {}) as EntradaProcessarAta;
+      empreendimentoId = exigirString(
+        dados.empreendimentoId,
+        "empreendimentoId",
+      );
+
+      const empreendimentoRef = db
+        .collection(COL_EMPREENDIMENTOS)
+        .doc(empreendimentoId);
+      const empreendimentoSnap = await empreendimentoRef.get();
+      if (!empreendimentoSnap.exists) {
+        throw new HttpsError("not-found", "Empreendimento não encontrado.");
+      }
+      const empreendimentoNome =
+        (empreendimentoSnap.get("nome") as string | undefined) ?? "Sem nome";
+
+      const storagePath =
+        typeof dados.storagePath === "string" && dados.storagePath.trim() !== ""
+          ? dados.storagePath.trim()
+          : undefined;
+      const textoColado =
+        typeof dados.texto === "string" && dados.texto.trim() !== ""
+          ? dados.texto.trim()
+          : undefined;
+
+      if (!storagePath && !textoColado) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Envie um arquivo (storagePath) ou cole o texto da ata (texto).",
+        );
+      }
+
+      const nomeArquivo =
+        typeof dados.nomeArquivo === "string" && dados.nomeArquivo.trim() !== ""
+          ? dados.nomeArquivo.trim()
+          : undefined;
+
+      // Cria a reunião já em "processando" para que a UI mostre o andamento.
+      reuniaoRef = empreendimentoRef.collection(COL_REUNIOES).doc();
+      let tipoFonte: TipoFonte = textoColado ? "texto_colado" : "manual";
+
+      await reuniaoRef.set({
+        data: normalizarData(dados.dataReuniao) || "",
+        tipoFonte,
+        nomeArquivoOriginal: nomeArquivo ?? null,
+        arquivoOriginalUrl: null,
+        status: "processando",
+        processadoEm: null,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
       let fonte: FonteExtracao;
 
       if (storagePath) {
@@ -154,11 +159,30 @@ export const processarAta = onCall(
         // URL de leitura para auditoria. Assinada por 10 anos porque não há
         // auth nesta fase; ao adicionar Firebase Auth, trocar por download
         // autenticado via SDK do client.
-        const [url] = await arquivo.getSignedUrl({
-          action: "read",
-          expires: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000,
-        });
-        await reuniaoRef.update({ arquivoOriginalUrl: url, tipoFonte });
+        //
+        // Falhar aqui não invalida a extração — é um link de conveniência, e o
+        // arquivo continua no Storage de qualquer forma. Assinar exige que a
+        // conta de serviço do runtime tenha `iam.serviceAccounts.signBlob`
+        // (papel "Service Account Token Creator"), que o Cloud Functions v2 não
+        // concede por padrão; sem o try, essa permissão faltando derrubaria o
+        // processamento inteiro de uma ata que foi lida com sucesso.
+        let urlAssinada: string | null = null;
+        try {
+          const [url] = await arquivo.getSignedUrl({
+            action: "read",
+            expires: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000,
+          });
+          urlAssinada = url;
+        } catch (falhaAoAssinar) {
+          logger.warn("Não foi possível gerar a URL de auditoria da ata", {
+            storagePath,
+            erro:
+              falhaAoAssinar instanceof Error
+                ? falhaAoAssinar.message
+                : String(falhaAoAssinar),
+          });
+        }
+        await reuniaoRef.update({ arquivoOriginalUrl: urlAssinada, tipoFonte });
       } else {
         fonte = { tipo: "texto", texto: textoColado as string };
         tipoFonte = "texto_colado";
@@ -210,30 +234,60 @@ export const processarAta = onCall(
         tipoFonte,
       };
     } catch (erro) {
-      const mensagem =
-        erro instanceof HttpsError
-          ? erro.message
-          : erro instanceof Error
-            ? erro.message
-            : "Erro desconhecido ao processar a ata.";
+      const mensagem = descreverErro(erro);
 
       logger.error("Falha ao processar ata", {
         empreendimentoId,
-        reuniaoId: reuniaoRef.id,
+        reuniaoId: reuniaoRef?.id ?? "(reunião não criada)",
         erro: mensagem,
+        stack: erro instanceof Error ? erro.stack : undefined,
       });
 
-      await reuniaoRef.update({
-        status: "erro",
-        erro: mensagem,
-        processadoEm: FieldValue.serverTimestamp(),
-      });
+      if (reuniaoRef) {
+        // Numa falha em cascata (o Firestore fora do ar, por exemplo) esta
+        // gravação também falharia; sem o try aninhado ela lançaria por cima
+        // do erro original e o chamador receberia "internal" sem explicação.
+        try {
+          await reuniaoRef.update({
+            status: "erro",
+            erro: mensagem,
+            processadoEm: FieldValue.serverTimestamp(),
+          });
+        } catch (falhaAoMarcar) {
+          logger.error("Não foi possível marcar a reunião como erro", {
+            reuniaoId: reuniaoRef.id,
+            erro:
+              falhaAoMarcar instanceof Error
+                ? falhaAoMarcar.message
+                : String(falhaAoMarcar),
+          });
+        }
+      }
 
       if (erro instanceof HttpsError) throw erro;
       throw new HttpsError("internal", mensagem);
     }
   },
 );
+
+/**
+ * Transforma qualquer coisa lançada numa mensagem que sirva de diagnóstico.
+ *
+ * Sem isto, um erro que não seja `HttpsError` chega ao navegador como um
+ * "internal" pelado, sem dizer o que aconteceu. Erros do Google Cloud carregam
+ * um `code` (por exemplo `PERMISSION_DENIED`, `ENOENT`) que costuma apontar a
+ * causa mais rápido que a mensagem, então ele vai junto.
+ */
+function descreverErro(erro: unknown): string {
+  if (erro instanceof HttpsError) return erro.message;
+  if (erro instanceof Error) {
+    const codigo = (erro as { code?: unknown }).code;
+    return codigo === undefined
+      ? erro.message
+      : `${erro.message} (code: ${String(codigo)})`;
+  }
+  return `Erro desconhecido ao processar a ata: ${String(erro)}`;
+}
 
 async function gravarTemas(args: {
   empreendimentoId: string;
@@ -265,4 +319,3 @@ async function gravarTemas(args: {
     await batch.commit();
   }
 }
-
